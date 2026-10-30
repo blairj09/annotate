@@ -1,0 +1,226 @@
+/* Quarto annotate overlay */
+
+.qa-layer {
+  --qa-inv: 1;
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.qa-layer.qa-capturing {
+  pointer-events: auto;
+  cursor: crosshair;
+  background: rgba(66, 113, 178, 0.04);
+  outline: 4px dashed rgba(66, 113, 178, 0.6);
+  outline-offset: -4px;
+}
+
+.reveal.overview .qa-layer,
+.qa-hidden .qa-layer {
+  display: none;
+}
+
+.qa-hover {
+  outline: 3px solid rgba(66, 113, 178, 0.9) !important;
+  outline-offset: 6px;
+}
+
+.qa-pin {
+  all: unset;
+  box-sizing: border-box;
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(var(--qa-inv));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 13px/1 system-ui, -apple-system, sans-serif;
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  border: 2px solid #fff;
+}
+
+.qa-pin.qa-open { background: #e07a1f; }
+.qa-pin.qa-done { background: #3b8a4b; }
+.qa-pin.qa-ghost { background: #4271b2; opacity: 0.85; }
+.qa-pin:hover { filter: brightness(1.1); }
+
+/* Floating UI lives outside .reveal, so theme styles don't reach it. */
+.qa-hud,
+.qa-editor,
+.qa-list {
+  position: fixed;
+  z-index: 2147483000;
+  font: 13px/1.35 system-ui, -apple-system, sans-serif;
+  color: #1f2933;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+.qa-hud {
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.qa-hud:hover,
+.qa-hud.qa-on { opacity: 1; }
+
+.qa-hud button,
+.qa-editor button {
+  font: inherit;
+  padding: 3px 9px;
+  border: 1px solid #d0d7de;
+  border-radius: 5px;
+  background: #f6f8fa;
+  color: inherit;
+  cursor: pointer;
+}
+
+.qa-hud button:hover,
+.qa-editor button:hover { background: #eaeef2; }
+
+.qa-hud .qa-toggle[aria-pressed="true"] {
+  background: #4271b2;
+  border-color: #4271b2;
+  color: #fff;
+}
+
+.qa-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b0b7c0;
+}
+
+.qa-dot.qa-online { background: #3b8a4b; }
+.qa-dot.qa-offline { background: #c0392b; }
+
+.qa-count { color: #57606a; padding: 0 2px; }
+
+.qa-editor {
+  width: 320px;
+  padding: 10px;
+}
+
+.qa-editor .qa-head {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.qa-editor .qa-target {
+  color: #57606a;
+  font-size: 12px;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qa-editor textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  font: inherit;
+  padding: 6px;
+  border: 1px solid #d0d7de;
+  border-radius: 5px;
+}
+
+.qa-editor { width: 360px; }
+
+.qa-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-bottom: 8px;
+  padding-right: 2px;
+}
+
+.qa-msg {
+  border-radius: 8px;
+  padding: 6px 9px;
+  max-width: 92%;
+}
+
+.qa-msg.qa-user {
+  align-self: flex-end;
+  background: #eaf0f7;
+  border: 1px solid #d0dbe5;
+}
+
+.qa-msg.qa-assistant {
+  align-self: flex-start;
+  background: #eef7f0;
+  border: 1px solid #cfe5d4;
+}
+
+.qa-thread ~ textarea { min-height: 52px; }
+
+.qa-who { font-size: 11px; font-weight: 600; color: #57606a; margin-bottom: 2px; }
+.qa-when { font-weight: 400; }
+.qa-text { white-space: pre-wrap; }
+
+.qa-status {
+  align-self: center;
+  font-size: 11px;
+  color: #57606a;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #f0f2f4;
+}
+
+.qa-status-done { color: #3b8a4b; background: #eef7f0; }
+
+.qa-editor .qa-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.qa-editor .qa-spacer { flex: 1; }
+
+.qa-editor .qa-primary {
+  background: #4271b2;
+  border-color: #4271b2;
+  color: #fff;
+}
+
+.qa-editor .qa-primary:hover { background: #355d94; }
+.qa-editor .qa-danger { color: #c0392b; }
+
+.qa-list {
+  top: 48px;
+  right: 10px;
+  width: 360px;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 6px 0;
+}
+
+.qa-list .qa-empty { padding: 8px 12px; color: #57606a; }
+
+.qa-list .qa-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f2f4;
+}
+
+.qa-list .qa-item:hover { background: #f6f8fa; }
+.qa-list .qa-item.qa-done { color: #57606a; }
+.qa-list .qa-meta { font-size: 11px; color: #57606a; }

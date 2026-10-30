@@ -1,0 +1,10 @@
+# Rendered output
+*.html
+*_files/
+/.quarto/
+
+# Working notes from the annotate overlay
+*.annotations.json
+.*.tmp
+
+.DS_Store

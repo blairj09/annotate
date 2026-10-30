@@ -1,0 +1,26 @@
+---
+title: "Annotate example"
+filters:
+  - annotate
+format:
+  revealjs:
+    hash: true
+---
+
+## Try it
+
+1. Start the notes server: `quarto run _extensions/annotate/server.ts`
+2. Preview this deck: `quarto preview example.qmd`
+3. Press **A**, click anything on a slide, and type a note
+
+## Something to annotate
+
+- This bullet is too long and says the same thing twice, twice
+- Maybe this one should come first
+- This slide could use a picture
+
+## Then ask your assistant
+
+Tell your coding assistant to "resolve the annotations in `example.annotations.json`."
+
+It edits `example.qmd`, replies on each pin, and marks it resolved. The pins turn green in the preview.

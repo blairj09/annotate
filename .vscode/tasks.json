@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Annotation server",
+      "detail": "Saves slide annotations to <deck>.annotations.json",
+      "type": "shell",
+      "command": "quarto",
+      "args": ["run", "_extensions/annotate/server.ts", "."],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "showReuseMessage": false,
+        "clear": true
+      },
+      "problemMatcher": {
+        "owner": "annotate",
+        "pattern": { "regexp": "^__never_matches__$" },
+        "background": {
+          "activeBegins": true,
+          "beginsPattern": "^Annotation server",
+          "endsPattern": "^Annotation server (on|already running)"
+        }
+      }
+    }
+  ]
+}
