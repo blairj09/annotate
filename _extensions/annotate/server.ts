@@ -33,7 +33,9 @@ const ID_RE = /^[A-Za-z0-9-]{1,64}$/;
 // Fields the browser may set. `num`, `thread`, and `response` belong to the
 // server and the assistant; `text` (the original comment) is only accepted when
 // a note is created. Replies go through POST /notes/reply.
-const CLIENT_FIELDS = new Set(["id", "slide", "x", "y", "target", "text", "created", "updated", "status"]);
+const CLIENT_FIELDS = new Set([
+  "id", "slide", "section", "anchor", "x", "y", "target", "text", "created", "updated", "status",
+]);
 const MAX_BODY = 1_000_000;
 
 // ---------- args ----------

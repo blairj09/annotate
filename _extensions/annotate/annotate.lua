@@ -1,4 +1,4 @@
--- Injects the click-to-annotate overlay into revealjs output.
+-- Injects the click-to-annotate overlay into revealjs and other HTML output.
 -- The overlay itself only activates when the deck is served from localhost,
 -- so a shipped self-contained file stays inert.
 
@@ -16,7 +16,9 @@ local function option(opts, key)
 end
 
 function Meta(meta)
-  if not quarto.doc.is_format("revealjs") then
+  -- is_format("html") is also true for revealjs, so check slides first.
+  local slides = quarto.doc.is_format("revealjs")
+  if not (slides or quarto.doc.is_format("html")) then
     return nil
   end
 
@@ -30,12 +32,13 @@ function Meta(meta)
 
   quarto.doc.add_html_dependency({
     name = "quarto-annotate",
-    version = "0.1.0",
+    version = "0.2.0",
     scripts = { { path = "annotate.js", afterBody = true } },
     stylesheets = { "annotate.css" },
     meta = {
       ["quarto-annotate-doc"] = doc,
       ["quarto-annotate-server"] = option(opts, "server") or DEFAULT_SERVER,
+      ["quarto-annotate-mode"] = slides and "slides" or "document",
     },
   })
   return nil

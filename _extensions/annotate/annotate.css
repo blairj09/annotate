@@ -224,3 +224,41 @@
 .qa-list .qa-item:hover { background: #f6f8fa; }
 .qa-list .qa-item.qa-done { color: #57606a; }
 .qa-list .qa-meta { font-size: 11px; color: #57606a; }
+
+/* Document view: the layer covers the whole page and scrolls with it. */
+.qa-layer.qa-document {
+  inset: auto;
+  left: 0;
+  top: 0;
+  width: 100%;
+  /* Below Quarto's fixed navbar (1030) so pins scroll under it. */
+  z-index: 1000;
+}
+
+.qa-layer.qa-document.qa-capturing {
+  outline: none;
+  background: transparent;
+}
+
+.qa-frame {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2147482000;
+  pointer-events: none;
+  outline: 4px dashed rgba(66, 113, 178, 0.6);
+  outline-offset: -4px;
+}
+
+.qa-frame.qa-on { display: block; }
+
+.qa-pin.qa-stale { opacity: 0.7; border-style: dashed; }
+
+.qa-flash {
+  outline: 3px solid #e07a1f !important;
+  outline-offset: 6px;
+}
+
+/* Keep the toolbar clear of navbars and the table of contents. */
+.qa-mode-document .qa-hud { top: auto; bottom: 12px; }
+.qa-mode-document .qa-list { top: auto; bottom: 56px; }
