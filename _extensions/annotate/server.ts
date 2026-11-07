@@ -244,20 +244,23 @@ function makeHandler(store: Store, verbose: boolean) {
 if (import.meta.main) {
   const args = parseArgs(Deno.args);
   const store = new Store(Deno.realPathSync(args.root));
+  // No "http://" scheme: Positron and VS Code open localhost URLs printed in a
+  // terminal in the Viewer, which would replace the deck preview with this API.
+  const addr = `${args.host}:${args.port}`;
   try {
     Deno.serve(
       {
         hostname: args.host,
         port: args.port,
         onListen: () =>
-          console.log(`Annotation server on http://${args.host}:${args.port}, writing to ${store.root}`),
+          console.log(`Annotation server on ${addr}, writing to ${store.root}`),
       },
       makeHandler(store, args.verbose),
     );
   } catch (e) {
     if (e instanceof Deno.errors.AddrInUse) {
       // Usually another window already started it. Not an error.
-      console.log(`Annotation server already running on http://${args.host}:${args.port}`);
+      console.log(`Annotation server already running on ${addr}`);
       Deno.exit(0);
     }
     throw e;
