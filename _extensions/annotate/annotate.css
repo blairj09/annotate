@@ -92,6 +92,14 @@
 .qa-hud button:hover,
 .qa-editor button:hover { background: #eaeef2; }
 
+.qa-hud .qa-send {
+  background: #3b8a4b;
+  border-color: #3b8a4b;
+  color: #fff;
+}
+.qa-hud .qa-send:hover { background: #33793f; }
+.qa-hud .qa-send:disabled { opacity: 0.5; cursor: default; }
+
 .qa-hud .qa-toggle[aria-pressed="true"] {
   background: #4271b2;
   border-color: #4271b2;

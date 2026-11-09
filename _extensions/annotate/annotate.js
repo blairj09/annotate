@@ -46,6 +46,7 @@
     deleted: new Set(),
     replies: [], // [{id, text}] waiting to be sent
     online: null,
+    assistant: false, // an editor extension is attached and can take notes
     active: false,
     editor: null,
     listOpen: false,
@@ -176,10 +177,12 @@
       }
       const data = await api("GET");
       setOnline(true);
+      state.assistant = !!data.editor;
       // Don't swap data out from under an open editor; the next poll catches up.
       if (!state.editor) state.notes = data.notes || [];
     } catch (e) {
       setOnline(false);
+      state.assistant = false;
     } finally {
       state.syncing = false;
       persist();
@@ -565,6 +568,10 @@
     const open = state.notes.filter((n) => n.status !== "done").length;
     ui.count.textContent = `${open} open`;
     ui.count.title = `${state.notes.length} total on this ${view.noun}`;
+    if (ui.send && !ui.send.dataset.busy) {
+      ui.send.style.display = state.assistant ? "" : "none";
+      ui.send.disabled = open === 0;
+    }
     if (state.listOpen) renderList();
   }
 
@@ -778,6 +785,26 @@
     setTimeout(() => (ui.copy.textContent = "Copy"), 1500);
   }
 
+  async function sendNotes() {
+    ui.send.dataset.busy = "1";
+    ui.send.disabled = true;
+    let label;
+    try {
+      await sync(); // make sure the server has every note before the assistant reads the file
+      if (state.pending.size || state.replies.length) throw new Error("unsynced");
+      await api("POST", null, {}, "/notes/submit");
+      label = "Sent";
+    } catch (e) {
+      label = "Send failed";
+    }
+    ui.send.textContent = label;
+    setTimeout(() => {
+      ui.send.textContent = "Send";
+      delete ui.send.dataset.busy;
+      render();
+    }, 1500);
+  }
+
   // ---------- setup ----------
 
   function buildUI() {
@@ -798,7 +825,11 @@
     ui.copy = el("button", null, "Copy");
     ui.copy.title = "Copy open notes as Markdown (to paste into chat)";
     ui.copy.addEventListener("click", copyNotes);
-    ui.hud.append(ui.toggle, ui.dot, ui.count, listBtn, ui.copy);
+    ui.send = el("button", "qa-send", "Send");
+    ui.send.title = "Send open notes to your assistant in the editor";
+    ui.send.style.display = "none";
+    ui.send.addEventListener("click", sendNotes);
+    ui.hud.append(ui.toggle, ui.dot, ui.count, listBtn, ui.copy, ui.send);
     ui.list = el("div", "qa-list");
     ui.list.style.display = "none";
     document.body.append(ui.hud, ui.list);

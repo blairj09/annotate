@@ -37,9 +37,13 @@ Pins are orange while open and turn into green checks when resolved. Click a pin
 
 The dot in the toolbar is green when the server is reachable. When it's red, notes are kept in the browser and sent to the server once it's running.
 
-### Start the server automatically
+### Positron and VS Code extension
 
-In Positron or VS Code, add this to `.vscode/tasks.json` to start the server when the folder opens (you'll be asked to allow automatic tasks once). Change the path if your extension lives somewhere else:
+The [Quarto Annotate](vscode/) editor extension does steps 1 and 4 for you. It starts the server when the folder opens (on its own port for each folder), stops it when the window closes, and adds a **Send** button to the overlay that sends the open notes to Posit Assistant. See [vscode/README.md](vscode/README.md).
+
+### Start the server automatically with a task
+
+Without the editor extension, add this to `.vscode/tasks.json` to start the server when the folder opens (you'll be asked to allow automatic tasks once). Change the path if your extension lives somewhere else:
 
 ```json
 {

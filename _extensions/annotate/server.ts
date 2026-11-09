@@ -7,12 +7,18 @@
  *
  *     quarto run _extensions/annotate/server.ts [ROOT] [--port 4850] [--host 127.0.0.1] [--verbose]
  *
- * API (all JSON; `doc` is the source file stem, e.g. `ll-bean`):
+ * API (all JSON; `doc` is the source file stem, e.g. `ll-bean`, or a path to it
+ * relative to ROOT, e.g. `customers/danone/deck`; the notes file sits next to the .qmd):
  *     GET    /health
  *     GET    /notes?doc=NAME               -> {"doc": NAME, "notes": [...]}
  *     POST   /notes?doc=NAME               upsert one note (merged by `id`)
  *     POST   /notes/reply?doc=NAME&id=ID   {"text": ...}: add a user reply, reopen
  *     DELETE /notes?doc=NAME&id=ID
+ *     POST   /notes/submit?doc=NAME        ask the attached editor to send open notes to its assistant
+ *     GET    /events?wait=SECONDS          long-poll for the next submit (used by the editor extension)
+ *
+ * `--watch-stdin` makes the server exit when stdin closes, so it stops with the
+ * editor that started it.
  */
 
 type Message = { author: "user" | "assistant"; text: string; at: string };
@@ -28,7 +34,14 @@ type Note = Record<string, unknown> & {
 };
 type Data = { doc: string; notes: Note[] };
 
-const DOC_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+// `doc` is the source file stem, optionally under folders relative to ROOT
+// (`customers/danone/deck`). Each segment must be a plain name: no `.`/`..`,
+// no hidden folders, no characters that are special on Windows.
+const SEGMENT_RE = /^[^./\\:*?"<>|\x00-\x1f][^/\\:*?"<>|\x00-\x1f]{0,127}$/;
+function validDoc(doc: string): boolean {
+  const parts = doc.split("/");
+  return parts.length <= 16 && parts.every((p) => SEGMENT_RE.test(p) && p.trim() === p);
+}
 const ID_RE = /^[A-Za-z0-9-]{1,64}$/;
 // Fields the browser may set. `num`, `thread`, and `response` belong to the
 // server and the assistant; `text` (the original comment) is only accepted when
@@ -41,7 +54,7 @@ const MAX_BODY = 1_000_000;
 // ---------- args ----------
 
 function parseArgs(argv: string[]) {
-  const out = { root: ".", port: 4850, host: "127.0.0.1", verbose: false };
+  const out = { root: ".", port: 4850, host: "127.0.0.1", verbose: false, watchStdin: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--port") out.port = Number(argv[++i]);
@@ -49,8 +62,9 @@ function parseArgs(argv: string[]) {
     else if (a === "--host") out.host = argv[++i];
     else if (a.startsWith("--host=")) out.host = a.slice(7);
     else if (a === "--verbose") out.verbose = true;
+    else if (a === "--watch-stdin") out.watchStdin = true;
     else if (a === "-h" || a === "--help") {
-      console.log("Usage: quarto run server.ts [ROOT] [--port 4850] [--host 127.0.0.1] [--verbose]");
+      console.log("Usage: quarto run server.ts [ROOT] [--port 4850] [--host 127.0.0.1] [--verbose] [--watch-stdin]");
       Deno.exit(0);
     } else if (!a.startsWith("-")) out.root = a;
   }
@@ -99,9 +113,54 @@ class Store {
   }
 
   write(doc: string, data: Data) {
-    const tmp = `${this.root}/.${doc}.${crypto.randomUUID().slice(0, 8)}.tmp`;
+    // Same folder as the target, so the rename stays atomic.
+    const slash = doc.lastIndexOf("/");
+    const dir = slash < 0 ? this.root : `${this.root}/${doc.slice(0, slash)}`;
+    const tmp = `${dir}/.${doc.slice(slash + 1)}.${crypto.randomUUID().slice(0, 8)}.tmp`;
     Deno.writeTextFileSync(tmp, JSON.stringify(data, null, 2) + "\n");
     Deno.renameSync(tmp, this.path(doc)); // atomic replace
+  }
+}
+
+// ---------- editor events ----------
+
+type SubmitEvent = { event: "submit"; doc: string; file: string; open: number; at: string };
+
+// Hands each submit to exactly one waiting editor, so two windows on the same
+// folder don't both start a chat. Events nobody picks up expire after a minute.
+class Bus {
+  private queue: { ev: SubmitEvent; t: number }[] = [];
+  private waiters: ((ev: SubmitEvent | null) => void)[] = [];
+  private lastSeen = 0;
+
+  // An editor counts as attached while it is waiting or just finished a poll.
+  attached(): boolean {
+    return this.waiters.length > 0 || Date.now() - this.lastSeen < 10_000;
+  }
+
+  push(ev: SubmitEvent) {
+    const w = this.waiters.shift();
+    if (w) w(ev);
+    else this.queue.push({ ev, t: Date.now() });
+  }
+
+  next(waitMs: number, signal: AbortSignal): Promise<SubmitEvent | null> {
+    this.lastSeen = Date.now();
+    this.queue = this.queue.filter((q) => Date.now() - q.t < 60_000);
+    const queued = this.queue.shift();
+    if (queued) return Promise.resolve(queued.ev);
+    return new Promise((resolve) => {
+      const done = (ev: SubmitEvent | null) => {
+        clearTimeout(timer);
+        this.waiters = this.waiters.filter((w) => w !== done);
+        this.lastSeen = Date.now();
+        resolve(ev);
+      };
+      const timer = setTimeout(() => done(null), waitMs);
+      // A disconnected editor must not swallow the next event.
+      signal.addEventListener("abort", () => done(null), { once: true });
+      this.waiters.push(done);
+    });
   }
 }
 
@@ -144,6 +203,15 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
   return body as Record<string, unknown>;
 }
 
+function save(store: Store, doc: string, data: Data) {
+  try {
+    store.write(doc, data);
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) throw new HttpError(404, `no folder for ${doc}`);
+    throw e;
+  }
+}
+
 function load(store: Store, doc: string): Data {
   try {
     return store.read(doc);
@@ -177,7 +245,7 @@ function upsert(store: Store, doc: string, body: Record<string, unknown>): Note 
     ensureThread(note);
   }
   note.updated = now();
-  store.write(doc, data);
+  save(store, doc, data);
   return note;
 }
 
@@ -190,7 +258,7 @@ function reply(store: Store, doc: string, id: string, body: Record<string, unkno
   ensureThread(note).push({ author: "user", text, at: now() });
   note.status = "open"; // a reply is a new request
   note.updated = now();
-  store.write(doc, data);
+  save(store, doc, data);
   return note;
 }
 
@@ -198,11 +266,18 @@ function remove(store: Store, doc: string, id: string) {
   const data = load(store, doc);
   const before = data.notes.length;
   data.notes = data.notes.filter((n) => n.id !== id);
-  if (data.notes.length !== before) store.write(doc, data);
+  if (data.notes.length !== before) save(store, doc, data);
   return { deleted: id };
 }
 
-function makeHandler(store: Store, verbose: boolean) {
+function submit(store: Store, bus: Bus, doc: string) {
+  if (!bus.attached()) throw new HttpError(409, "no editor is attached to this server");
+  const open = load(store, doc).notes.filter((n) => n.status !== "done").length;
+  bus.push({ event: "submit", doc, file: store.path(doc), open, at: now() });
+  return { ok: true, open };
+}
+
+function makeHandler(store: Store, verbose: boolean, bus = new Bus()) {
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
@@ -218,18 +293,27 @@ function makeHandler(store: Store, verbose: boolean) {
 
   async function route(req: Request, url: URL, path: string): Promise<Response> {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
-    if (req.method === "GET" && path === "/health") return json(200, { ok: true, root: store.root });
-    if (path !== "/notes" && path !== "/notes/reply") throw new HttpError(404, "not found");
+    if (req.method === "GET" && path === "/health") {
+      return json(200, { ok: true, root: store.root, editor: bus.attached() });
+    }
+    if (req.method === "GET" && path === "/events") {
+      const wait = Math.min(Math.max(Number(url.searchParams.get("wait") ?? 25), 0), 55);
+      return json(200, { event: await bus.next(wait * 1000, req.signal) });
+    }
+    if (path !== "/notes" && path !== "/notes/reply" && path !== "/notes/submit") {
+      throw new HttpError(404, "not found");
+    }
 
     const doc = url.searchParams.get("doc") ?? "";
-    if (!DOC_RE.test(doc)) throw new HttpError(400, "invalid or missing `doc`");
+    if (!validDoc(doc)) throw new HttpError(400, "invalid or missing `doc`");
     const id = url.searchParams.get("id") ?? "";
 
     if (req.method === "GET" && path === "/notes") {
       const data = load(store, doc);
       data.notes.forEach(ensureThread); // display only; the file is rewritten on the next change
-      return json(200, data);
+      return json(200, { ...data, editor: bus.attached() });
     }
+    if (req.method === "POST" && path === "/notes/submit") return json(200, submit(store, bus, doc));
     if (req.method === "POST") {
       const body = await readBody(req); // the only await; storage below is sync
       return json(200, path === "/notes/reply" ? reply(store, doc, id, body) : upsert(store, doc, body));
@@ -247,6 +331,12 @@ if (import.meta.main) {
   // No "http://" scheme: Positron and VS Code open localhost URLs printed in a
   // terminal in the Viewer, which would replace the deck preview with this API.
   const addr = `${args.host}:${args.port}`;
+  if (args.watchStdin) {
+    (async () => {
+      for await (const _ of Deno.stdin.readable) { /* drain until the parent goes away */ }
+      Deno.exit(0);
+    })();
+  }
   try {
     Deno.serve(
       {
