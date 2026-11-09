@@ -1,0 +1,75 @@
+{
+  "name": "quarto-annotate",
+  "displayName": "Quarto Annotate",
+  "description": "Runs the notes server for the Quarto annotate extension and sends slide notes to your AI assistant.",
+  "version": "0.1.0",
+  "publisher": "blairj09",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blairj09/annotate"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["quarto", "revealjs", "slides", "annotations", "assistant"],
+  "main": "./extension.js",
+  "activationEvents": [
+    "workspaceContains:**/_extensions/**/annotate/server.ts"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Starts a local notes server with Quarto."
+    }
+  },
+  "contributes": {
+    "commands": [
+      { "command": "quartoAnnotate.sendToAssistant", "title": "Send Open Notes to Assistant", "category": "Annotate" },
+      { "command": "quartoAnnotate.restartServer", "title": "Restart Notes Server", "category": "Annotate" },
+      { "command": "quartoAnnotate.showLog", "title": "Show Log", "category": "Annotate" },
+      { "command": "quartoAnnotate.menu", "title": "Show Menu", "category": "Annotate" }
+    ],
+    "configuration": {
+      "title": "Quarto Annotate",
+      "properties": {
+        "quartoAnnotate.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the notes server when a folder with the annotate extension opens."
+        },
+        "quartoAnnotate.quartoPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the quarto executable. Empty uses quarto.path, then PATH, then the Quarto bundled with Positron."
+        },
+        "quartoAnnotate.assistant.behavior": {
+          "type": "string",
+          "enum": ["submit", "prefill"],
+          "default": "submit",
+          "enumDescriptions": [
+            "Send the request right away.",
+            "Put the request in the chat input so you can edit it first."
+          ],
+          "description": "What happens when you click Send in the overlay."
+        },
+        "quartoAnnotate.assistant.target": {
+          "type": "string",
+          "enum": ["auto", "new"],
+          "default": "auto",
+          "enumDescriptions": [
+            "Use the current Posit Assistant chat.",
+            "Start a new chat each time."
+          ],
+          "description": "Which Posit Assistant chat receives the notes."
+        },
+        "quartoAnnotate.assistant.includeInstructions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include the steps for resolving notes in the request, so AGENTS.md doesn't need them."
+        }
+      }
+    }
+  }
+}

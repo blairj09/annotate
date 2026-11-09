@@ -1,0 +1,76 @@
+# Builds the Positron / VS Code extension.
+# - Every push and PR that touches vscode/: package it and keep the .vsix as an artifact.
+# - Tags like vscode-v0.1.0: also attach the .vsix to a GitHub release, and publish
+#   to Open VSX (and the VS Code Marketplace) when the token secrets are set.
+name: Editor extension
+
+on:
+  push:
+    branches: [main]
+    paths: ["vscode/**", ".github/workflows/vscode-extension.yml"]
+    tags: ["vscode-v*"]
+  pull_request:
+    paths: ["vscode/**", ".github/workflows/vscode-extension.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check syntax
+        run: node --check extension.js
+
+      - name: Check tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/vscode-v')
+        run: |
+          want="${GITHUB_REF_NAME#vscode-v}"
+          have="$(node -p "require('./package.json').version")"
+          if [ "$want" != "$have" ]; then
+            echo "::error::Tag is $want but package.json says $have"
+            exit 1
+          fi
+
+      - name: Package
+        run: |
+          cp ../LICENSE LICENSE
+          npx --yes @vscode/vsce package -o quarto-annotate.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quarto-annotate-vsix
+          path: vscode/quarto-annotate.vsix
+
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/vscode-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#vscode-v}"
+          cp quarto-annotate.vsix "quarto-annotate-$version.vsix"
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "Editor extension $version" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" "quarto-annotate-$version.vsix" --clobber
+
+      - name: Publish to Open VSX
+        if: startsWith(github.ref, 'refs/tags/vscode-v') && env.OVSX_PAT != ''
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx --yes ovsx publish quarto-annotate.vsix -p "$OVSX_PAT"
+
+      - name: Publish to VS Code Marketplace
+        if: startsWith(github.ref, 'refs/tags/vscode-v') && env.VSCE_PAT != ''
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish --packagePath quarto-annotate.vsix -p "$VSCE_PAT"
