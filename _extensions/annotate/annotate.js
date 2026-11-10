@@ -34,6 +34,7 @@
   const MODE = metaContent("quarto-annotate-mode"); // "slides", "document", or null to detect
   const STORE_KEY = "quarto-annotate:" + DOC;
   const MODE_KEY = "quarto-annotate-active:" + DOC;
+  const DONE_KEY = "quarto-annotate-show-done"; // one preference for every document
   const POLL_MS = 3000;
   const CLIENT_FIELDS = ["id", "slide", "section", "anchor", "x", "y", "target", "text", "created", "updated"];
   const BLOCKS =
@@ -52,6 +53,7 @@
     listOpen: false,
     syncing: false,
     renderSig: "",
+    showDone: false, // resolved notes are hidden unless the user asks to see them
     hoverEl: null,
   };
   const ui = {};
@@ -118,6 +120,11 @@
   }
 
   function restore() {
+    try {
+      state.showDone = localStorage.getItem(DONE_KEY) === "1";
+    } catch (e) {
+      /* storage blocked: keep the default */
+    }
     try {
       const data = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
       state.notes = data.notes || [];
@@ -539,12 +546,12 @@
   function render(force) {
     const view = state.view;
     if (!view) return;
-    const sig = JSON.stringify([state.notes, view.sig(), state.listOpen]);
+    const sig = JSON.stringify([state.notes, view.sig(), state.listOpen, state.showDone]);
     if (!force && sig === state.renderSig) return;
     state.renderSig = sig;
 
     ui.layer.replaceChildren();
-    for (const note of state.notes.filter(view.visible)) {
+    for (const note of state.notes.filter(view.visible).filter(shown)) {
       const pos = view.place(note);
       if (!pos) continue;
       const done = note.status === "done";
@@ -568,6 +575,9 @@
     const open = state.notes.filter((n) => n.status !== "done").length;
     ui.count.textContent = `${open} open`;
     ui.count.title = `${state.notes.length} total on this ${view.noun}`;
+    const resolved = state.notes.length - open;
+    ui.done.style.display = resolved ? "" : "none";
+    ui.done.textContent = state.showDone ? "Hide resolved" : `Show resolved (${resolved})`;
     if (ui.send && !ui.send.dataset.busy) {
       ui.send.style.display = state.assistant ? "" : "none";
       ui.send.disabled = open === 0;
@@ -578,10 +588,19 @@
   function renderList() {
     ui.list.replaceChildren();
     const view = state.view;
-    const sorted = [...state.notes].sort(view.order);
-    if (!sorted.length) {
+    const sorted = state.notes.filter(shown).sort(view.order);
+    const hidden = state.notes.length - sorted.length;
+    if (!state.notes.length) {
       ui.list.appendChild(el("div", "qa-empty", view.emptyHint));
       return;
+    }
+    if (hidden) {
+      const more = el("button", "qa-more", `${hidden} resolved hidden · Show`);
+      more.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        setShowDone(true);
+      });
+      ui.list.appendChild(more);
     }
     for (const note of sorted) {
       const item = el("div", "qa-item" + (note.status === "done" ? " qa-done" : ""));
@@ -598,6 +617,22 @@
       });
       ui.list.appendChild(item);
     }
+  }
+
+  function shown(note) {
+    return state.showDone || note.status !== "done";
+  }
+
+  function setShowDone(on) {
+    state.showDone = on;
+    try {
+      localStorage.setItem(DONE_KEY, on ? "1" : "0");
+    } catch (e) {
+      /* ignore */
+    }
+    // Don't leave an editor open on a pin that just disappeared.
+    if (!on && state.editor && !state.editor.isNew && state.editor.note?.status === "done") closeEditor();
+    render(true);
   }
 
   function toggleList(force) {
@@ -826,6 +861,9 @@
     ui.count = el("span", "qa-count", "0 open");
     const listBtn = el("button", null, "List");
     listBtn.addEventListener("click", () => toggleList());
+    ui.done = el("button", "qa-done-toggle");
+    ui.done.title = "Show or hide resolved notes";
+    ui.done.addEventListener("click", () => setShowDone(!state.showDone));
     ui.copy = el("button", null, "Copy");
     ui.copy.title = "Copy open notes as Markdown (to paste into chat)";
     ui.copy.addEventListener("click", copyNotes);
@@ -833,7 +871,7 @@
     ui.send.title = "Send open notes to your assistant in the editor";
     ui.send.style.display = "none";
     ui.send.addEventListener("click", sendNotes);
-    ui.hud.append(ui.toggle, ui.dot, ui.count, listBtn, ui.copy, ui.send);
+    ui.hud.append(ui.toggle, ui.dot, ui.count, listBtn, ui.done, ui.copy, ui.send);
     ui.list = el("div", "qa-list");
     ui.list.style.display = "none";
     document.body.append(ui.hud, ui.list);

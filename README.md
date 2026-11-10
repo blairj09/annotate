@@ -35,7 +35,7 @@ Click anywhere on a slide or page in the live preview and type what you want cha
 
 ## Using the overlay
 
-Pins are orange while open and turn into green checks when resolved. Click a pin to read the thread, reply (which reopens the note), resolve or reopen it yourself, or delete it. **List** shows every note and jumps to its slide or section. **Copy** puts the open notes on the clipboard as Markdown, for assistants that can't read files. **Send** only appears when the editor extension is connected.
+Pins are orange while open and turn into green checks when resolved. Click a pin to read the thread, reply (which reopens the note), resolve or reopen it yourself, or delete it. **List** shows every note and jumps to its slide or section. **Copy** puts the open notes on the clipboard as Markdown, for assistants that can't read files. **Send** only appears when the editor extension is connected. Resolved notes are hidden by default, so the page shows only what's still open. **Show resolved** brings them back on the page and in List, and the setting is remembered in your browser.
 
 The dot in the toolbar is green when the server is reachable. When it's red, notes are kept in the browser and sent to the server once it's running.
 

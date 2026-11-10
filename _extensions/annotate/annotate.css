@@ -227,6 +227,14 @@
 }
 
 .qa-list .qa-empty { padding: 8px 12px; color: #57606a; }
+.qa-list .qa-more {
+  all: unset;
+  display: block;
+  padding: 6px 12px;
+  color: #4271b2;
+  cursor: pointer;
+}
+.qa-list .qa-more:hover { text-decoration: underline; }
 
 .qa-list .qa-item {
   padding: 6px 12px;
