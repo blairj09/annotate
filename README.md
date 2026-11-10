@@ -4,46 +4,56 @@ Leave notes on your Quarto slides and documents for an AI coding assistant to re
 
 Click anywhere on a slide or page in the live preview and type what you want changed: "shorten this bullet," "swap these two," "drop this slide." Notes are saved to a JSON file next to your `.qmd`. Your assistant reads that file, edits the source, and replies on each pin. Each note is a thread, so you can reply to follow up, and the assistant sees the whole conversation.
 
-## Install
+## Quick start (Positron or VS Code)
 
-```bash
-quarto add blairj09/annotate
-```
-
-Then add the filter to your deck's or document's front matter:
-
-```yaml
-filters:
-  - annotate
-```
-
-## Use
-
-1. **Start the notes server** from your project folder. It runs on the Deno bundled with Quarto, so there's nothing else to install:
+1. **Add the Quarto extension** to your project:
 
    ```bash
-   quarto run _extensions/blairj09/annotate/server.ts
+   quarto add blairj09/annotate
    ```
 
-   It writes `<deck>.annotations.json` to the current folder. Options: a different folder to write to, `--port` (default 4850), `--host`, and `--verbose`. If a server is already running on the port, a second copy exits quietly.
+   Then add the filter to your deck's or document's front matter:
 
-2. **Preview the deck or document** with `quarto preview deck.qmd`, or Preview in Positron or VS Code.
+   ```yaml
+   filters:
+     - annotate
+   ```
 
-3. **Annotate.** Press **A** or click **Annotate** in the toolbar (top right on slides, bottom right on documents). Hover to see what you're pointing at, click, type a note, and press Cmd/Ctrl+Enter.
+2. **Install the editor extension.** Download `quarto-annotate-<version>.vsix` from the [latest release](https://github.com/blairj09/annotate/releases?q=vscode-v) and run **Extensions: Install from VSIX…**, or:
 
-4. **Ask your assistant** to "resolve the annotations." When the file changes, the preview picks it up within a few seconds.
+   ```bash
+   positron --install-extension quarto-annotate-0.1.0.vsix   # or: code --install-extension
+   ```
 
-Pins are orange while open and turn into green checks when resolved. Click a pin to read the thread, reply (which reopens the note), resolve or reopen it yourself, or delete it. **List** shows every note and jumps to its slide or section. **Copy** puts the open notes on the clipboard as Markdown, for assistants that can't read files.
+   It starts the notes server when the folder opens and stops it when the window closes. Each workspace folder gets its own port, and every Quarto project inside it is handled. See [vscode/README.md](vscode/README.md) for settings.
+
+3. **Preview** the deck or document with Preview in Positron or VS Code, or `quarto preview deck.qmd` in the terminal. (If a preview was already running when you installed the extension, restart it once.)
+
+4. **Annotate.** Press **A** or click **Annotate** in the toolbar (top right on slides, bottom right on documents). Hover to see what you're pointing at, click, type a note, and press Cmd/Ctrl+Enter.
+
+5. **Send.** Click **Send** in the toolbar to hand the open notes to Posit Assistant, which edits the source and replies on each pin. Without Posit Assistant, the request goes to your clipboard to paste into any assistant. You can also just ask your assistant to "resolve the annotations." The preview picks up changes within a few seconds.
+
+## Using the overlay
+
+Pins are orange while open and turn into green checks when resolved. Click a pin to read the thread, reply (which reopens the note), resolve or reopen it yourself, or delete it. **List** shows every note and jumps to its slide or section. **Copy** puts the open notes on the clipboard as Markdown, for assistants that can't read files. **Send** only appears when the editor extension is connected.
 
 The dot in the toolbar is green when the server is reachable. When it's red, notes are kept in the browser and sent to the server once it's running.
 
-### Positron and VS Code extension
+## Without the editor extension
 
-The [Quarto Annotate](vscode/) editor extension does steps 1 and 4 for you. It starts the server when the folder opens (on its own port for each folder), stops it when the window closes, and adds a **Send** button to the overlay that sends the open notes to Posit Assistant. See [vscode/README.md](vscode/README.md).
+In RStudio, another editor, or a plain browser, start the notes server yourself from the project folder. It runs on the Deno bundled with Quarto, so there's nothing else to install:
 
-### Start the server automatically with a task
+```bash
+quarto run _extensions/blairj09/annotate/server.ts
+```
 
-Without the editor extension, add this to `.vscode/tasks.json` to start the server when the folder opens (you'll be asked to allow automatic tasks once). Change the path if your extension lives somewhere else:
+It writes `<deck>.annotations.json` to the current folder. Options: a different folder to write to, `--port` (default 4850), `--host`, and `--verbose`. If a server is already running on the port, a second copy exits quietly. Then preview, annotate, and ask your assistant to "resolve the annotations" (the Send button doesn't appear without the editor extension).
+
+If you run more than one project at a time, give each its own `--port` and set the same port in front matter (see [Options](#options)), so notes don't go to another project's server.
+
+### Start the server with a VS Code task
+
+If you use Positron or VS Code but not the editor extension, add this to `.vscode/tasks.json` to start the server when the folder opens (you'll be asked to allow automatic tasks once). Change the path if your extension lives somewhere else:
 
 ```json
 {
@@ -70,7 +80,7 @@ Without the editor extension, add this to `.vscode/tasks.json` to start the serv
 }
 ```
 
-### Rendering for an audience
+## Rendering for an audience
 
 The overlay only runs when the deck is served from `localhost` or `127.0.0.1`, so a rendered HTML file opened from disk or a web server stays clean. To leave the script out of the file entirely, turn the filter off for one render:
 
@@ -78,7 +88,9 @@ The overlay only runs when the deck is served from `localhost` or `127.0.0.1`, s
 quarto render deck.qmd -M annotate:false
 ```
 
-Options (front matter):
+## Options
+
+Front matter:
 
 ```yaml
 annotate:
@@ -86,9 +98,11 @@ annotate:
   server: http://127.0.0.1:4850    # match `server.ts --port`
 ```
 
+Leave `server` out when you use the editor extension. It picks the port, and a `server` in front matter overrides it.
+
 ## For your assistant
 
-Paste this into your project's `AGENTS.md`, `CLAUDE.md`, or equivalent:
+**Send** includes these steps in the request, so with the editor extension you don't need them anywhere else. To ask an assistant yourself ("resolve the annotations"), or to use one that doesn't get the request from Send (Claude Code, Codex), paste this into your project's `AGENTS.md`, `CLAUDE.md`, or equivalent:
 
 ```markdown
 ## Slide annotations
@@ -169,7 +183,7 @@ Notes on an HTML document have `section` and `anchor` in place of `slide`:
 
 ## Server API
 
-All JSON. `doc` is the source file name without `.qmd`.
+All JSON. `doc` is the source file name without `.qmd`. With the editor extension it can include folders relative to the workspace folder (`customers/danone/deck`), and the notes file is saved next to the `.qmd`.
 
 | Request | Does |
 |---|---|
@@ -178,6 +192,8 @@ All JSON. `doc` is the source file name without `.qmd`.
 | `POST /notes?doc=NAME` | Create or update one note, matched by `id` |
 | `POST /notes/reply?doc=NAME&id=ID` | Add a user reply `{"text": "..."}` and reopen the note |
 | `DELETE /notes?doc=NAME&id=ID` | Delete a note |
+| `POST /notes/submit?doc=NAME` | Ask the connected editor to send the open notes to its assistant |
+| `GET /events?wait=SECONDS` | Wait for the next submit (used by the editor extension) |
 
 ## Limits
 
