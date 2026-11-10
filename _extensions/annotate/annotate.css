@@ -21,6 +21,11 @@
   display: none;
 }
 
+/* Pins only show in annotate mode, so the deck looks clean while you review it. */
+.qa-layer:not(.qa-capturing) .qa-pin {
+  display: none;
+}
+
 .qa-hover {
   outline: 3px solid rgba(66, 113, 178, 0.9) !important;
   outline-offset: 6px;

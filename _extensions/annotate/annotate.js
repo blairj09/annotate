@@ -593,6 +593,7 @@
       if (last && last.author === "assistant") item.appendChild(el("div", "qa-meta", "↳ " + snippet(last.text, 140)));
       item.addEventListener("click", () => {
         toggleList(false);
+        setActive(true); // pins only show in annotate mode
         view.goTo(note);
       });
       ui.list.appendChild(item);
@@ -721,7 +722,10 @@
     ui.frame?.classList.toggle("qa-on", on);
     ui.toggle.setAttribute("aria-pressed", String(on));
     ui.hud.classList.toggle("qa-on", on);
-    if (!on) setHover(null);
+    if (!on) {
+      setHover(null);
+      closeEditor(); // its pin is hidden now
+    }
     try {
       sessionStorage.setItem(MODE_KEY, on ? "1" : "0");
     } catch (e) {
