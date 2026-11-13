@@ -8,9 +8,9 @@
 "use strict";
 
 const vscode = require("vscode");
-const cp = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { launchQuarto } = require("./launch");
 
 const PORT_BASE = 4850;
 const PORT_SPAN = 100;
@@ -136,7 +136,7 @@ class Folder {
     return new Promise((resolve) => {
       const args = ["run", this.serverTs, this.root, "--port", String(port), "--watch-stdin"];
       info(`Starting: ${quarto} ${args.join(" ")}`);
-      const child = cp.spawn(quarto, args, { cwd: this.root, stdio: ["pipe", "pipe", "pipe"] });
+      const child = launchQuarto(quarto, args, { cwd: this.root, stdio: ["pipe", "pipe", "pipe"] });
       let settled = false;
       const settle = (ok) => {
         if (!settled) {
