@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="56" fill="#4271b2"/>
+  <!-- slide -->
+  <rect x="36" y="60" width="184" height="128" rx="12" fill="#fff"/>
+  <rect x="56" y="82" width="96" height="14" rx="7" fill="#1f2933"/>
+  <rect x="56" y="112" width="128" height="9" rx="4.5" fill="#b8c4d2"/>
+  <rect x="56" y="132" width="108" height="9" rx="4.5" fill="#b8c4d2"/>
+  <rect x="56" y="152" width="80" height="9" rx="4.5" fill="#b8c4d2"/>
+  <!-- note pin -->
+  <circle cx="190" cy="180" r="38" fill="#e07a1f" stroke="#fff" stroke-width="9"/>
+  <path d="M174 180h32M190 164v32" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+</svg>
