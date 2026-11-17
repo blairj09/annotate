@@ -38,7 +38,10 @@ jobs:
           node-version: 24
 
       - name: Check syntax
-        run: node --check extension.js
+        run: node --check extension.js && node --check yaml-filter.js
+
+      - name: Test
+        run: node --test test
 
       - name: Check tag matches package.json version
         if: startsWith(github.ref, 'refs/tags/vscode-v')

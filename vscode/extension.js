@@ -5,12 +5,16 @@
 // - long-polls the server for "Send" clicks in the overlay and hands the notes
 //   to Posit Assistant
 // - shows the open-note count in the status bar
+// - "Set Up This Project" installs the Quarto extension and turns on the filter
 "use strict";
 
 const vscode = require("vscode");
 const cp = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { addFilter, addFilterToQmd, qmdHasFilters } = require("./yaml-filter");
+
+const QUARTO_EXTENSION = "blairj09/annotate";
 
 const PORT_BASE = 4850;
 const PORT_SPAN = 100;
@@ -378,9 +382,153 @@ async function sendCommand(folder) {
   if (doc) await sendToAssistant(folder, doc);
 }
 
+// ---------- project setup ----------
+
+function runQuarto(quarto, args, cwd) {
+  return new Promise((resolve) => {
+    info(`Running: ${quarto} ${args.join(" ")} (in ${cwd})`);
+    const child = cp.spawn(quarto, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    const onData = (buf) => {
+      out += buf.toString();
+      for (const line of buf.toString().split(/\r?\n/)) if (line.trim()) info(`quarto: ${line}`);
+    };
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    child.on("error", (e) => resolve({ code: -1, out: e.message }));
+    child.on("exit", (code) => resolve({ code, out }));
+  });
+}
+
+// The nearest folder at or above `dir` (but inside the workspace folder) with a _quarto.yml.
+function findProjectDir(dir, wsRoot) {
+  for (let d = dir; ; d = path.dirname(d)) {
+    for (const name of ["_quarto.yml", "_quarto.yaml"]) {
+      const file = path.join(d, name);
+      if (fs.existsSync(file)) return { dir: d, file };
+    }
+    const atTop = samePath(d, wsRoot) || path.relative(wsRoot, d).startsWith("..") || path.dirname(d) === d;
+    if (atTop) return null;
+  }
+}
+
+async function pickQmd() {
+  const active = vscode.window.activeTextEditor?.document;
+  if (active && active.uri.scheme === "file" && /\.qmd$/i.test(active.fileName)) return active.uri;
+  const found = await vscode.workspace.findFiles("**/*.qmd", SKIP_DIRS, 200);
+  if (!found.length) return null;
+  if (found.length === 1) return found[0];
+  const pick = await vscode.window.showQuickPick(
+    found
+      .map((uri) => ({ label: vscode.workspace.asRelativePath(uri), uri }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    { placeHolder: "Which document do you want to annotate?" }
+  );
+  return pick ? pick.uri : null;
+}
+
+// Edit through a TextDocument so unsaved changes in an open editor are kept.
+async function editFile(uri, transform) {
+  const doc = await vscode.workspace.openTextDocument(uri);
+  const res = transform(doc.getText());
+  if (!res.changed) return false;
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), res.text);
+  if (!(await vscode.workspace.applyEdit(edit))) throw new Error(`Couldn't edit ${path.basename(uri.fsPath)}`);
+  await doc.save();
+  return true;
+}
+
+async function setupProject() {
+  const qmd = await pickQmd();
+  if (!qmd) {
+    vscode.window.showWarningMessage("Open the .qmd you want to annotate, then run this command again.");
+    return;
+  }
+  const ws = vscode.workspace.getWorkspaceFolder(qmd);
+  if (!ws) {
+    vscode.window.showWarningMessage("That document isn't in an open workspace folder.");
+    return;
+  }
+  const quarto = findQuarto();
+  if (!quarto) {
+    vscode.window.showErrorMessage("Couldn't find quarto. Install Quarto or set quartoAnnotate.quartoPath.");
+    return;
+  }
+
+  const docDir = path.dirname(qmd.fsPath);
+  const project = findProjectDir(docDir, ws.uri.fsPath);
+  // Quarto looks for _extensions next to the document or at the project root.
+  const installDir = project ? project.dir : docDir;
+  const rel = (p) => vscode.workspace.asRelativePath(p) || ".";
+
+  // Where the filter goes. Document-level `filters` may replace the project's,
+  // so a document with its own list always gets it there.
+  const docText = (await vscode.workspace.openTextDocument(qmd)).getText();
+  let target = qmd;
+  if (project && !qmdHasFilters(docText)) {
+    const pick = await vscode.window.showQuickPick(
+      [
+        { label: "Every document in the project", description: rel(project.file), uri: vscode.Uri.file(project.file) },
+        { label: "Just this document", description: rel(qmd), uri: qmd },
+      ],
+      { placeHolder: "Turn on annotations for…" }
+    );
+    if (!pick) return;
+    target = pick.uri;
+  }
+
+  try {
+    await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: "Setting up Annotate" },
+      async (progress) => {
+        const installed = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(installDir, "_extensions/**/annotate/server.ts"),
+          null,
+          1
+        );
+        if (!installed.length) {
+          progress.report({ message: `quarto add ${QUARTO_EXTENSION}` });
+          const r = await runQuarto(quarto, ["add", QUARTO_EXTENSION, "--no-prompt"], installDir);
+          if (r.code !== 0) throw new Error(`quarto add failed (see Annotate: Show Log). ${r.out.trim().split("\n").pop() || ""}`);
+        } else {
+          info(`Quarto extension already in ${rel(installDir)}; not reinstalling`);
+        }
+
+        progress.report({ message: `Adding the filter to ${path.basename(target.fsPath)}` });
+        const isQmd = /\.qmd$/i.test(target.fsPath);
+        const changed = await editFile(target, (text) =>
+          isQmd ? addFilterToQmd(text) : addFilter(text, text.includes("\r\n") ? "\r\n" : "\n")
+        );
+        info(changed ? `Added the annotate filter to ${rel(target)}` : `${rel(target)} already has the annotate filter`);
+
+        progress.report({ message: "Starting the notes server" });
+        const f = folders.get(ws.uri.toString());
+        if (!f) await addFolder(ws, true);
+        else if (f.state !== "running") await f.restart();
+      }
+    );
+  } catch (e) {
+    info(e.message);
+    vscode.window.showErrorMessage(e.message);
+    return;
+  }
+
+  const commands = await vscode.commands.getCommands(true);
+  const canPreview = commands.includes("quarto.preview");
+  const choice = await vscode.window.showInformationMessage(
+    `Annotate is set up for ${path.basename(qmd.fsPath)}. Preview it, then press A to add notes or D to draw.`,
+    ...(canPreview ? ["Preview"] : [])
+  );
+  if (choice === "Preview") {
+    await vscode.window.showTextDocument(qmd);
+    await vscode.commands.executeCommand("quarto.preview");
+  }
+}
+
 // ---------- lifecycle ----------
 
-async function addFolder(ws) {
+async function addFolder(ws, start) {
   if (folders.has(ws.uri.toString())) return;
   const found = await vscode.workspace.findFiles(
     new vscode.RelativePattern(ws, "**/_extensions/**/annotate/server.ts"),
@@ -391,7 +539,7 @@ async function addFolder(ws) {
   const f = new Folder(ws, found[0].fsPath);
   folders.set(ws.uri.toString(), f);
   refreshStatus();
-  if (cfg().get("autoStart")) await f.start();
+  if (start || cfg().get("autoStart")) await f.start();
   else {
     f.state = "stopped";
     refreshStatus();
@@ -422,6 +570,7 @@ function activate(ctx) {
     }),
     vscode.commands.registerCommand("quartoAnnotate.showLog", () => log.show()),
     vscode.commands.registerCommand("quartoAnnotate.menu", menu),
+    vscode.commands.registerCommand("quartoAnnotate.setupProject", setupProject),
     vscode.workspace.onDidChangeWorkspaceFolders((e) => {
       e.removed.forEach(removeFolder);
       e.added.forEach(addFolder);

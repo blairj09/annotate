@@ -6,26 +6,14 @@ Click anywhere on a slide or page in the live preview and type what you want cha
 
 ## Quick start (Positron or VS Code)
 
-1. **Add the Quarto extension** to your project:
+1. **Install the editor extension.** Search for **Quarto Annotate** in the Extensions pane (it's on [Open VSX](https://open-vsx.org/extension/blairj09/quarto-annotate)). It starts the notes server when the folder opens and stops it when the window closes. See [vscode/README.md](vscode/README.md) for settings.
 
-   ```bash
-   quarto add blairj09/annotate
-   ```
-
-   Then add the filter to your deck's or document's front matter:
+2. **Set up the project.** Open your `.qmd` and run **Annotate: Set Up This Project** from the Command Palette. It runs `quarto add blairj09/annotate` and adds the filter, to `_quarto.yml` or to just that document. To do it by hand instead, run `quarto add blairj09/annotate` and add this to the front matter:
 
    ```yaml
    filters:
      - annotate
    ```
-
-2. **Install the editor extension.** Download `quarto-annotate-<version>.vsix` from the [latest release](https://github.com/blairj09/annotate/releases?q=vscode-v) and run **Extensions: Install from VSIX…**, or:
-
-   ```bash
-   positron --install-extension quarto-annotate-0.1.0.vsix   # or: code --install-extension
-   ```
-
-   It starts the notes server when the folder opens and stops it when the window closes. Each workspace folder gets its own port, and every Quarto project inside it is handled. See [vscode/README.md](vscode/README.md) for settings.
 
 3. **Preview** the deck or document with Preview in Positron or VS Code, or `quarto preview deck.qmd` in the terminal. (If a preview was already running when you installed the extension, restart it once.)
 

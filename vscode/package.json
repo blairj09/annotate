@@ -2,7 +2,7 @@
   "name": "quarto-annotate",
   "displayName": "Quarto Annotate",
   "description": "Runs the notes server for the Quarto annotate extension and sends slide notes to your AI assistant.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "blairj09",
   "license": "MIT",
   "icon": "icon.png",
@@ -27,6 +27,7 @@
   },
   "contributes": {
     "commands": [
+      { "command": "quartoAnnotate.setupProject", "title": "Set Up This Project", "category": "Annotate" },
       { "command": "quartoAnnotate.sendToAssistant", "title": "Send Open Notes to Assistant", "category": "Annotate" },
       { "command": "quartoAnnotate.restartServer", "title": "Restart Notes Server", "category": "Annotate" },
       { "command": "quartoAnnotate.showLog", "title": "Show Log", "category": "Annotate" },

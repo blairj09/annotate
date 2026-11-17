@@ -2,6 +2,9 @@
 
 The editor side of the [annotate](https://github.com/blairj09/annotate) Quarto extension.
 
+**Get started:** open a `.qmd` and run **Annotate: Set Up This Project** from the Command Palette. It runs `quarto add blairj09/annotate`, adds the `annotate` filter (to `_quarto.yml` or just that document, your choice), and starts the notes server. Then preview and press **A**.
+
+- **Sets up a project in one step** with the command above. Running it again is safe: it skips what's already done.
 - **Starts one notes server per workspace folder** that has the annotate Quarto extension anywhere inside it, and stops it when the window closes. No `tasks.json` needed.
 - **Handles every Quarto project in the folder.** Documents are named by their path from the workspace folder (`customers/danone/deck`), and each notes file is saved next to its `.qmd`.
 - **Picks a port per folder**, so several windows or worktrees can be open at once. New terminals get `QUARTO_ANNOTATE_SERVER` and `QUARTO_ANNOTATE_ROOT`, and the annotate filter uses them, so `quarto preview` finds the right server and document name. (An `annotate: server:` in front matter still wins.)
@@ -24,10 +27,11 @@ Terminals that were open before the extension started don't have the variable. R
 
 ## Build
 
-No build step. To package and install locally:
+No build step. To test, package, and install locally:
 
 ```bash
 cd vscode
+node --test test
 npx @vscode/vsce package
-positron --install-extension quarto-annotate-0.1.0.vsix   # or: code --install-extension
+positron --install-extension quarto-annotate-<version>.vsix   # or: code --install-extension
 ```
