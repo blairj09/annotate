@@ -31,7 +31,7 @@ No build step. To test, package, and install locally:
 
 ```bash
 cd vscode
-node --test test
+node --test "test/*.test.js"
 npx @vscode/vsce package
 positron --install-extension quarto-annotate-<version>.vsix   # or: code --install-extension
 ```
