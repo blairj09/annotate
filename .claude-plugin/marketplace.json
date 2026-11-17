@@ -1,0 +1,14 @@
+{
+  "name": "annotate",
+  "description": "Leave notes on Quarto slides and documents for Claude to resolve.",
+  "owner": {
+    "name": "James Blair"
+  },
+  "plugins": [
+    {
+      "name": "annotate",
+      "source": "./claude-plugin",
+      "description": "Starts the annotate notes server with each session and adds /annotate to resolve notes left in the Quarto preview."
+    }
+  ]
+}

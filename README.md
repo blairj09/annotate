@@ -29,6 +29,17 @@ Pins are orange while open and turn into green checks when resolved. Click a pin
 
 The dot in the toolbar is green when the server is reachable. When it's red, notes are kept in the browser and sent to the server once it's running.
 
+## Claude Code (CLI or Claude Desktop)
+
+Install the plugin, which starts the notes server with each session and adds `/annotate` to resolve notes:
+
+```bash
+claude plugin marketplace add blairj09/annotate
+claude plugin install annotate@annotate
+```
+
+Then run `/annotate setup` in a project, preview the deck (Desktop's built-in browser works), annotate, and run `/annotate`. See [claude-plugin/README.md](claude-plugin/README.md).
+
 ## Without the editor extension
 
 In RStudio, another editor, or a plain browser, start the notes server yourself from the project folder. It runs on the Deno bundled with Quarto, so there's nothing else to install:

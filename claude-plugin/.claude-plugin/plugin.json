@@ -1,0 +1,13 @@
+{
+  "name": "annotate",
+  "displayName": "Quarto Annotate",
+  "version": "0.1.0",
+  "description": "Starts the annotate notes server with each session and adds /annotate to resolve notes left in the Quarto preview.",
+  "author": {
+    "name": "James Blair"
+  },
+  "homepage": "https://github.com/blairj09/annotate",
+  "repository": "https://github.com/blairj09/annotate",
+  "license": "MIT",
+  "keywords": ["quarto", "revealjs", "slides", "annotations"]
+}
