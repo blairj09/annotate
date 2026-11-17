@@ -47,7 +47,7 @@ const ID_RE = /^[A-Za-z0-9-]{1,64}$/;
 // server and the assistant; `text` (the original comment) is only accepted when
 // a note is created. Replies go through POST /notes/reply.
 const CLIENT_FIELDS = new Set([
-  "id", "slide", "section", "anchor", "x", "y", "target", "text", "created", "updated", "status",
+  "id", "slide", "section", "anchor", "x", "y", "strokes", "bounds", "target", "text", "created", "updated", "status",
 ]);
 const MAX_BODY = 1_000_000;
 

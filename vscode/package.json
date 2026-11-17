@@ -2,7 +2,7 @@
   "name": "quarto-annotate",
   "displayName": "Quarto Annotate",
   "description": "Runs the notes server for the Quarto annotate extension and sends slide notes to your AI assistant.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "blairj09",
   "license": "MIT",
   "repository": {
@@ -56,11 +56,11 @@
         },
         "quartoAnnotate.assistant.target": {
           "type": "string",
-          "enum": ["auto", "new"],
-          "default": "auto",
+          "enum": ["new", "auto"],
+          "default": "new",
           "enumDescriptions": [
-            "Use the current Posit Assistant chat.",
-            "Start a new chat each time."
+            "Start a new chat for each send.",
+            "Use the current Posit Assistant chat."
           ],
           "description": "Which Posit Assistant chat receives the notes."
         },

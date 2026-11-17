@@ -19,7 +19,7 @@ Terminals that were open before the extension started don't have the variable. R
 | `quartoAnnotate.autoStart` | `true` | Start the server when the folder opens |
 | `quartoAnnotate.quartoPath` | `""` | Falls back to `quarto.path`, then `PATH`, then Positron's bundled Quarto |
 | `quartoAnnotate.assistant.behavior` | `submit` | `prefill` puts the request in the chat box without sending it |
-| `quartoAnnotate.assistant.target` | `auto` | `new` starts a new chat each time |
+| `quartoAnnotate.assistant.target` | `new` | Each send starts a new chat. `auto` uses the current chat instead. |
 | `quartoAnnotate.assistant.includeInstructions` | `true` | Put the resolve steps in the request, so `AGENTS.md` doesn't need them |
 
 ## Build

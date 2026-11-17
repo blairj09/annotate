@@ -20,7 +20,7 @@ const SKIP_DIRS = "**/{node_modules,renv,.venv,.git,.quarto}/**";
 const INSTRUCTIONS = `To resolve them:
 
 1. Work on notes with "status": "open". Each note has a thread of messages ({"author": "user" | "assistant", "text", "at"}). The request is the latest user message, read in the context of the whole thread.
-2. Find the note's place in the .qmd. Slide notes have slide: match on slide.title and target.text, then slide.number. Document notes have section and anchor: match on section.title and target.text, then on anchor (the index-th anchor.tag element in that section, from 0).
+2. Find the note's place in the .qmd. Slide notes have slide: match on slide.title and target.text, then slide.number. Document notes have section and anchor: match on section.title and target.text, then on anchor (the index-th anchor.tag element in that section, from 0). A note with strokes is a freehand drawing (a layout sketch): each stroke is a list of [x, y] points in % of the slide (documents: of the anchor element), and bounds is its box {x, y, w, h}. Read the sketch together with the text.
 3. Make the edit. Then set "status": "done" and append {"author": "assistant", "text": "<one line saying what changed>", "at": "<ISO time>"} to thread. Change only status, thread (append only), slide, section, and anchor.
 4. If you add, remove, or retitle slides, update slide.h, slide.id, and slide.title on affected notes. Set slide.h to -1 if the slide was removed. If you retitle a document section, update section.title (and section.id).
 5. If a note is a question or unclear, append your answer or question and leave it open.

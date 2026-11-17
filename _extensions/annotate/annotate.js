@@ -1,7 +1,9 @@
 /* Quarto annotate: click-to-annotate overlay for Quarto previews.
  *
  * Press A (or the HUD button) to enter annotate mode, click anywhere on a
- * slide or page, and type a note. Notes go to the local notes server, which
+ * slide or page, and type a note. Press D (or Draw) to sketch freehand instead;
+ * a drawing is a note whose `strokes` are polylines in % of the slide (or of the
+ * anchor element in documents). Notes go to the local notes server, which
  * writes <doc>.annotations.json next to the source. Falls back to localStorage
  * when the server isn't running.
  *
@@ -36,7 +38,11 @@
   const MODE_KEY = "quarto-annotate-active:" + DOC;
   const DONE_KEY = "quarto-annotate-show-done"; // one preference for every document
   const POLL_MS = 3000;
-  const CLIENT_FIELDS = ["id", "slide", "section", "anchor", "x", "y", "target", "text", "created", "updated"];
+  const COLLAPSE_KEY = "quarto-annotate-collapsed"; // one preference for every document
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const CLIENT_FIELDS = [
+    "id", "slide", "section", "anchor", "x", "y", "strokes", "bounds", "target", "text", "created", "updated",
+  ];
   const BLOCKS =
     "li, p, h1, h2, h3, h4, h5, h6, td, th, dt, dd, figcaption, blockquote, pre, img, video, svg, summary";
 
@@ -49,6 +55,9 @@
     online: null,
     assistant: false, // an editor extension is attached and can take notes
     active: false,
+    tool: "note", // "note" (click to pin) or "draw" (freehand strokes)
+    collapsed: false,
+    drawing: null, // the <svg> being drawn right now
     editor: null,
     listOpen: false,
     syncing: false,
@@ -74,6 +83,7 @@
 
   const clamp = (v) => Math.min(100, Math.max(0, v));
   const round1 = (v) => Math.round(v * 10) / 10;
+  const round2 = (v) => Math.round(v * 100) / 100;
 
   function snippet(text, n) {
     const s = (text || "").replace(/\s+/g, " ").trim();
@@ -122,6 +132,7 @@
   function restore() {
     try {
       state.showDone = localStorage.getItem(DONE_KEY) === "1";
+      state.collapsed = localStorage.getItem(COLLAPSE_KEY) === "1";
     } catch (e) {
       /* storage blocked: keep the default */
     }
@@ -317,6 +328,10 @@
         return n.slide.h === idx.h && (n.slide.v || 0) === (idx.v || 0);
       },
       place: (n) => ({ left: n.x + "%", top: n.y + "%" }),
+      // Drawings cover the whole slide; points are % of it.
+      frame: () => ({ left: "0", top: "0", width: "100%", height: "100%" }),
+      rect: () => ui.layer.getBoundingClientRect(),
+      clampStrokes: true,
       locate(ev) {
         const r = ui.layer.getBoundingClientRect();
         return {
@@ -335,6 +350,7 @@
       bind(on) {
         scaleLayer(deck.getScale());
         deck.addKeyBinding({ keyCode: 65, key: "A", description: "Toggle annotate mode" }, on.toggle);
+        deck.addKeyBinding({ keyCode: 68, key: "D", description: "Toggle drawing in annotate mode" }, on.draw);
         deck.on("slidechanged", on.changed);
         deck.on("resize", (ev) => scaleLayer(ev.scale));
         deck.on("overviewshown", on.closeEditor);
@@ -471,6 +487,24 @@
           top: r.top - base.top + ((n.y || 0) / 100) * r.height + "px",
         };
       },
+      // Drawings are placed relative to the anchor element, like pins.
+      frame(n) {
+        const res = resolve(n);
+        const r = res && res.exact && visibleRect(res.el);
+        if (!r) return null;
+        const base = ui.layer.getBoundingClientRect();
+        return {
+          left: r.left - base.left + "px",
+          top: r.top - base.top + "px",
+          width: r.width + "px",
+          height: r.height + "px",
+        };
+      },
+      rect(n) {
+        const res = resolve(n);
+        return res && visibleRect(res.el);
+      },
+      clampStrokes: false,
       locate(ev, node) {
         const target = node || root;
         const heading = node ? headingFor(node) : null;
@@ -525,6 +559,7 @@
           if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.defaultPrevented) return;
           if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
           if (ev.key === "a" || ev.key === "A") on.toggle();
+          else if ((ev.key === "d" || ev.key === "D") && state.active) on.draw();
           else if (ev.key === "Escape" && state.active) on.toggle();
         });
       },
@@ -555,6 +590,8 @@
       const pos = view.place(note);
       if (!pos) continue;
       const done = note.status === "done";
+      const svg = drawingSvg(note, done ? "qa-done" : "qa-open");
+      if (svg) ui.layer.appendChild(svg);
       const pin = el("button", "qa-pin " + (done ? "qa-done" : "qa-open"), done ? "✓" : String(note.num || "•"));
       pin.style.left = pos.left;
       pin.style.top = pos.top;
@@ -571,9 +608,11 @@
       ui.layer.appendChild(pin);
     }
     if (state.editor && state.editor.isNew) ui.layer.appendChild(state.editor.ghost);
+    if (state.drawing) ui.layer.appendChild(state.drawing);
 
     const open = state.notes.filter((n) => n.status !== "done").length;
     ui.count.textContent = `${open} open`;
+    updateFold(open);
     ui.count.title = `${state.notes.length} total on this ${view.noun}`;
     const resolved = state.notes.length - open;
     ui.done.style.display = resolved ? "" : "none";
@@ -584,6 +623,100 @@
     }
     if (state.listOpen) renderList();
   }
+
+  // ---------- drawings ----------
+
+  function drawingSvg(note, cls) {
+    if (!Array.isArray(note.strokes) || !note.strokes.length) return null;
+    const frame = state.view.frame(note);
+    if (!frame) return null;
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "qa-drawing " + (cls || "qa-draft"));
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.setAttribute("preserveAspectRatio", "none");
+    Object.assign(svg.style, frame);
+    for (const stroke of note.strokes) {
+      const line = document.createElementNS(SVG_NS, "polyline");
+      line.setAttribute("points", stroke.map((p) => p.join(",")).join(" "));
+      svg.appendChild(line);
+    }
+    return svg;
+  }
+
+  function strokeBounds(strokes) {
+    const pts = strokes.flat();
+    const xs = pts.map((p) => p[0]);
+    const ys = pts.map((p) => p[1]);
+    const x = Math.min(...xs);
+    const y = Math.min(...ys);
+    return { x: round1(x), y: round1(y), w: round1(Math.max(...xs) - x), h: round1(Math.max(...ys) - y) };
+  }
+
+  function onLayerDown(ev) {
+    if (!state.active || state.tool !== "draw" || ev.target !== ui.layer || ev.button !== 0) return;
+    ev.preventDefault();
+    const adding = !!(state.editor && state.editor.isNew && state.editor.note.strokes);
+    if (state.editor && !adding) return closeEditor();
+
+    let note;
+    if (adding) {
+      note = state.editor.note;
+    } else {
+      const node = elementAt(ev.clientX, ev.clientY);
+      note = Object.assign(
+        { id: uid(), target: describe(node), text: "", status: "open", created: new Date().toISOString(), strokes: [] },
+        state.view.locate(ev, node)
+      );
+    }
+    const r = state.view.rect(note);
+    if (!r || !r.width || !r.height) return;
+    const clampPt = state.view.clampStrokes ? clamp : (v) => v;
+    const point = (e) => [
+      round2(clampPt(((e.clientX - r.left) / r.width) * 100)),
+      round2(clampPt(((e.clientY - r.top) / r.height) * 100)),
+    ];
+
+    const stroke = [point(ev)];
+    note.strokes.push(stroke);
+    const svg = drawingSvg(note, "qa-draft");
+    if (!svg) return note.strokes.pop();
+    if (adding) {
+      state.editor.ghost.replaceWith(svg);
+      state.editor.ghost = svg;
+    } else {
+      state.drawing = svg;
+      ui.layer.appendChild(svg);
+    }
+    const line = svg.lastChild;
+    let last = [ev.clientX, ev.clientY];
+
+    const move = (e) => {
+      if (Math.hypot(e.clientX - last[0], e.clientY - last[1]) < 2) return;
+      last = [e.clientX, e.clientY];
+      stroke.push(point(e));
+      line.setAttribute("points", stroke.map((p) => p.join(",")).join(" "));
+    };
+    const up = (e) => {
+      ui.layer.removeEventListener("pointermove", move);
+      ui.layer.removeEventListener("pointerup", up);
+      ui.layer.removeEventListener("pointercancel", up);
+      try {
+        ui.layer.releasePointerCapture(ev.pointerId);
+      } catch (err) {
+        /* capture already gone */
+      }
+      if (stroke.length === 1) stroke.push(stroke[0].slice()); // a tap draws a dot
+      note.bounds = strokeBounds(note.strokes);
+      state.drawing = null;
+      if (!adding) openEditor(note, { left: e.clientX, top: e.clientY }, true);
+    };
+    ui.layer.setPointerCapture(ev.pointerId);
+    ui.layer.addEventListener("pointermove", move);
+    ui.layer.addEventListener("pointerup", up);
+    ui.layer.addEventListener("pointercancel", up);
+  }
+
+  // ---------- list ----------
 
   function renderList() {
     ui.list.replaceChildren();
@@ -655,7 +788,7 @@
     closeEditor();
     setHover(null);
     const box = el("div", "qa-editor");
-    box.appendChild(el("div", "qa-head", (isNew ? "New note" : `Note #${note.num || "?"}`) + " · " + state.view.label(note)));
+    box.appendChild(el("div", "qa-head", (isNew ? (note.strokes ? "New drawing" : "New note") : `Note #${note.num || "?"}`) + " · " + state.view.label(note)));
     box.appendChild(el("div", "qa-target", describeTargetShort(note.target)));
 
     if (!isNew) {
@@ -677,7 +810,11 @@
     }
 
     const textarea = el("textarea");
-    textarea.placeholder = isNew ? "Describe the change you want…" : "Reply…";
+    textarea.placeholder = isNew
+      ? note.strokes
+        ? "Describe what this drawing means… (draw more to add strokes)"
+        : "Describe the change you want…"
+      : "Reply…";
     if (!isNew) textarea.rows = 2;
     box.appendChild(textarea);
 
@@ -725,7 +862,10 @@
     });
 
     let ghost = null;
-    if (isNew) {
+    if (isNew && note.strokes) {
+      ghost = drawingSvg(note, "qa-draft") || el("div");
+      ui.layer.appendChild(ghost);
+    } else if (isNew) {
       ghost = el("div", "qa-pin qa-ghost", "+");
       const pos = state.view.place(note) || { left: "0px", top: "0px" };
       ghost.style.left = pos.left;
@@ -751,7 +891,44 @@
     node?.classList.add("qa-hover");
   }
 
+  function setTool(tool) {
+    state.tool = tool;
+    ui.layer.classList.toggle("qa-drawmode", tool === "draw");
+    ui.draw.setAttribute("aria-pressed", String(tool === "draw"));
+    setHover(null);
+    if (state.editor && state.editor.isNew) closeEditor();
+  }
+
+  // Drawing only makes sense inside annotate mode, so D switches it on.
+  function toggleDraw() {
+    const wasDrawing = state.active && state.tool === "draw";
+    if (!state.active) setActive(true);
+    setTool(wasDrawing ? "note" : "draw");
+  }
+
+  function updateFold(open) {
+    if (!ui.fold) return;
+    ui.fold.textContent = state.collapsed ? `✎ ${open}` : "–";
+    ui.fold.title = state.collapsed ? "Expand the annotate toolbar" : "Collapse the annotate toolbar";
+  }
+
+  function setCollapsed(on) {
+    state.collapsed = on;
+    ui.hud.classList.toggle("qa-collapsed", on);
+    if (on) {
+      setActive(false);
+      toggleList(false);
+    }
+    try {
+      localStorage.setItem(COLLAPSE_KEY, on ? "1" : "0");
+    } catch (e) {
+      /* ignore */
+    }
+    updateFold(state.notes.filter((n) => n.status !== "done").length);
+  }
+
   function setActive(on) {
+    if (on && state.collapsed) setCollapsed(false);
     state.active = on;
     ui.layer.classList.toggle("qa-capturing", on);
     ui.frame?.classList.toggle("qa-on", on);
@@ -760,6 +937,7 @@
     if (!on) {
       setHover(null);
       closeEditor(); // its pin is hidden now
+      setTool("note");
     }
     try {
       sessionStorage.setItem(MODE_KEY, on ? "1" : "0");
@@ -769,7 +947,7 @@
   }
 
   function onLayerClick(ev) {
-    if (!state.active || ev.target !== ui.layer) return;
+    if (!state.active || state.tool !== "note" || ev.target !== ui.layer) return;
     if (state.editor) return closeEditor();
     const node = elementAt(ev.clientX, ev.clientY);
     const note = Object.assign(
@@ -781,7 +959,7 @@
 
   let hoverFrame = 0;
   function onLayerMove(ev) {
-    if (!state.active || state.editor || hoverFrame) return;
+    if (!state.active || state.tool !== "note" || state.editor || hoverFrame) return;
     hoverFrame = requestAnimationFrame(() => {
       hoverFrame = 0;
       setHover(elementAt(ev.clientX, ev.clientY));
@@ -797,6 +975,13 @@
       lines.push(
         `- #${n.num || "?"} ${state.view.label(n)}, ${describeTargetShort(n.target)} ` + `(x ${n.x}%, y ${n.y}%):`
       );
+      if (n.bounds) {
+        const b = n.bounds;
+        lines.push(
+          `  - Drawing: ${n.strokes.length} stroke(s) covering x ${b.x}–${round1(b.x + b.w)}%, ` +
+            `y ${b.y}–${round1(b.y + b.h)}% of ${n.slide ? "the slide" : "the target element"} (points are in the notes file)`
+        );
+      }
       for (const m of threadOf(n)) lines.push(`  - ${m.author === "assistant" ? "Assistant" : "User"}: ${m.text}`);
     }
     return lines.join("\n");
@@ -850,6 +1035,7 @@
     ui.layer = el("div", "qa-layer");
     state.view.layerParent().appendChild(ui.layer);
     ui.layer.addEventListener("click", onLayerClick);
+    ui.layer.addEventListener("pointerdown", onLayerDown);
     ui.layer.addEventListener("mousemove", onLayerMove);
     ui.layer.addEventListener("mouseleave", () => setHover(null));
 
@@ -857,6 +1043,9 @@
     ui.toggle = el("button", "qa-toggle", "Annotate");
     ui.toggle.title = "Toggle annotate mode (A)";
     ui.toggle.addEventListener("click", () => setActive(!state.active));
+    ui.draw = el("button", "qa-draw", "Draw");
+    ui.draw.title = "Draw freehand on the page (D)";
+    ui.draw.addEventListener("click", toggleDraw);
     ui.dot = el("span", "qa-dot");
     ui.count = el("span", "qa-count", "0 open");
     const listBtn = el("button", null, "List");
@@ -871,7 +1060,10 @@
     ui.send.title = "Send open notes to your assistant in the editor";
     ui.send.style.display = "none";
     ui.send.addEventListener("click", sendNotes);
-    ui.hud.append(ui.toggle, ui.dot, ui.count, listBtn, ui.done, ui.copy, ui.send);
+    ui.fold = el("button", "qa-fold", "–");
+    ui.fold.addEventListener("click", () => setCollapsed(!state.collapsed));
+    ui.hud.append(ui.toggle, ui.draw, ui.dot, ui.count, listBtn, ui.done, ui.copy, ui.send, ui.fold);
+    ui.hud.classList.toggle("qa-collapsed", state.collapsed);
     ui.list = el("div", "qa-list");
     ui.list.style.display = "none";
     document.body.append(ui.hud, ui.list);
@@ -884,6 +1076,7 @@
     setOnline(false);
     view.bind({
       toggle: () => setActive(!state.active),
+      draw: toggleDraw,
       changed: () => {
         closeEditor();
         render(true);
@@ -892,7 +1085,7 @@
     });
 
     try {
-      setActive(sessionStorage.getItem(MODE_KEY) === "1");
+      setActive(sessionStorage.getItem(MODE_KEY) === "1" && !state.collapsed);
     } catch (e) {
       setActive(false);
     }

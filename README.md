@@ -35,6 +35,8 @@ Click anywhere on a slide or page in the live preview and type what you want cha
 
 ## Using the overlay
 
+Press **D** (or click **Draw**) to sketch freehand, for example to show a layout change. Drag to draw, draw more strokes if needed, then type what the drawing means and save. The toolbar's **–** button collapses it to a small pill (and leaves annotate mode); click the pill to bring it back.
+
 Pins are orange while open and turn into green checks when resolved. Click a pin to read the thread, reply (which reopens the note), resolve or reopen it yourself, or delete it. **List** shows every note and jumps to its slide or section. **Copy** puts the open notes on the clipboard as Markdown, for assistants that can't read files. **Send** only appears when the editor extension is connected. Resolved notes are hidden by default, so the page shows only what's still open. **Show resolved** brings them back on the page and in List, and the setting is remembered in your browser.
 
 The dot in the toolbar is green when the server is reachable. When it's red, notes are kept in the browser and sent to the server once it's running.
@@ -116,6 +118,9 @@ Slide notes live in `<deck>.annotations.json`. To "resolve annotations":
    `slide.title` and `target.text`, then `slide.number`. Document notes have
    `section` and `anchor`: match on `section.title` and `target.text`, then on
    `anchor` (the `index`-th `anchor.tag` element in that section, from 0).
+   A note with `strokes` is a freehand drawing (a layout sketch): each stroke is a list
+   of `[x, y]` points in % of the slide (documents: of the anchor element), and
+   `bounds` is its box `{x, y, w, h}`. Read the sketch together with the text.
 3. Make the edit. Then set `"status": "done"` and append
    `{"author": "assistant", "text": "<one line saying what changed>", "at": "<ISO time>"}`
    to `thread`. Change only `status`, `thread` (append only), `slide`, `section`,
@@ -157,6 +162,7 @@ Two renders at once can produce a broken HTML file.
 
 - `slide.number` is the visible slide number. `h` and `v` are reveal.js indices.
 - `x` and `y` are percentages of the slide, from the top left.
+- Drawings (press **D** or click **Draw**) add `strokes`, a list of polylines of `[x, y]` points in the same percentages, plus `bounds`.
 
 Notes on an HTML document have `section` and `anchor` in place of `slide`:
 

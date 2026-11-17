@@ -26,6 +26,35 @@
   display: none;
 }
 
+.qa-layer.qa-drawmode.qa-capturing {
+  /* A pen with its tip (the hotspot) at the bottom left, outlined in white so it shows on dark slides. */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' stroke='white' stroke-width='4'/%3E%3Cpath d='M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' fill='%234271b2' stroke='%231f2933' stroke-width='1.5'/%3E%3C/svg%3E") 2 22, crosshair;
+  touch-action: none;
+}
+
+.qa-drawing {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+  color: #e07a1f;
+}
+
+.qa-drawing.qa-done { color: #3b8a4b; opacity: 0.7; }
+.qa-drawing.qa-draft { color: #4271b2; }
+
+.qa-drawing polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.qa-layer:not(.qa-capturing) .qa-drawing {
+  display: none;
+}
+
 .qa-hover {
   outline: 3px solid rgba(66, 113, 178, 0.9) !important;
   outline-offset: 6px;
@@ -105,7 +134,8 @@
 .qa-hud .qa-send:hover { background: #33793f; }
 .qa-hud .qa-send:disabled { opacity: 0.5; cursor: default; }
 
-.qa-hud .qa-toggle[aria-pressed="true"] {
+.qa-hud .qa-toggle[aria-pressed="true"],
+.qa-hud .qa-draw[aria-pressed="true"] {
   background: #4271b2;
   border-color: #4271b2;
   color: #fff;
@@ -283,3 +313,8 @@
 /* Keep the toolbar clear of navbars and the table of contents. */
 .qa-mode-document .qa-hud { top: auto; bottom: 12px; }
 .qa-mode-document .qa-list { top: auto; bottom: 56px; }
+
+/* Collapsed: only the fold button remains, as a small pill showing the open count. */
+.qa-hud.qa-collapsed > :not(.qa-fold) { display: none; }
+.qa-hud.qa-collapsed { padding: 3px; opacity: 1; }
+.qa-hud.qa-collapsed .qa-fold { border: 0; background: transparent; }
