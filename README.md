@@ -99,11 +99,11 @@ annotate:
   server: http://127.0.0.1:4850    # match `server.ts --port`
 ```
 
-Leave `server` out when you use the editor extension. It picks the port, and a `server` in front matter overrides it.
+Leave `server` out when you use the editor extension or the Claude Code plugin. They pick the port, and a `server` in front matter overrides it.
 
 ## For your assistant
 
-**Send** includes these steps in the request, so with the editor extension you don't need them anywhere else. To ask an assistant yourself ("resolve the annotations"), or to use one that doesn't get the request from Send (Claude Code, Codex), paste this into your project's `AGENTS.md`, `CLAUDE.md`, or equivalent:
+**Send** includes these steps in the request, and the [Claude Code plugin](#claude-code-cli-or-claude-desktop)'s `/annotate` skill has them too, so with either you don't need them anywhere else. For other assistants (Codex, Gemini CLI, or any assistant you ask yourself to "resolve the annotations"), paste this into your project's `AGENTS.md`, `CLAUDE.md`, or equivalent:
 
 ```markdown
 ## Slide annotations

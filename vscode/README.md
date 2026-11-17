@@ -11,7 +11,7 @@ The editor side of the [annotate](https://github.com/blairj09/annotate) Quarto e
 - **Adds a Send button to the overlay.** It sends the open notes to Posit Assistant. If Posit Assistant isn't installed, the request goes to your clipboard instead.
 - **Shows the open-note count** in the status bar. Click it to send notes, restart the server, see the log, or open a notes file.
 
-Needs version 0.3.0 or later of the annotate Quarto extension (`quarto add blairj09/annotate` to update).
+Needs version 0.3.0 or later of the annotate Quarto extension, and 0.4.0 or later for drawings (`quarto add blairj09/annotate` to update).
 
 Terminals that were open before the extension started don't have the variable. Restart a running preview once after installing.
 
