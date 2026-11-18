@@ -1,4 +1,4 @@
-# annotate
+# annotate <img src="vscode/icon.svg" align="right" width="120" alt="" />
 
 Leave notes on your Quarto slides and documents for an AI coding assistant to resolve.
 
