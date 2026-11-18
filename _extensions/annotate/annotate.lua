@@ -63,7 +63,7 @@ function Meta(meta)
 
   quarto.doc.add_html_dependency({
     name = "quarto-annotate",
-    version = "0.3.0",
+    version = "0.4.0",
     scripts = { { path = "annotate.js", afterBody = true } },
     stylesheets = { "annotate.css" },
     meta = {

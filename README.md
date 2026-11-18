@@ -6,26 +6,14 @@ Click anywhere on a slide or page in the live preview and type what you want cha
 
 ## Quick start (Positron or VS Code)
 
-1. **Add the Quarto extension** to your project:
+1. **Install the editor extension.** Search for **Quarto Annotate** in the Extensions pane (it's on [Open VSX](https://open-vsx.org/extension/blairj09/quarto-annotate)). It starts the notes server when the folder opens and stops it when the window closes. See [vscode/README.md](vscode/README.md) for settings.
 
-   ```bash
-   quarto add blairj09/annotate
-   ```
-
-   Then add the filter to your deck's or document's front matter:
+2. **Set up the project.** Open your `.qmd` and run **Annotate: Set Up This Project** from the Command Palette. It runs `quarto add blairj09/annotate` and adds the filter, to `_quarto.yml` or to just that document. To do it by hand instead, run `quarto add blairj09/annotate` and add this to the front matter:
 
    ```yaml
    filters:
      - annotate
    ```
-
-2. **Install the editor extension.** Download `quarto-annotate-<version>.vsix` from the [latest release](https://github.com/blairj09/annotate/releases?q=vscode-v) and run **Extensions: Install from VSIX…**, or:
-
-   ```bash
-   positron --install-extension quarto-annotate-0.1.0.vsix   # or: code --install-extension
-   ```
-
-   It starts the notes server when the folder opens and stops it when the window closes. Each workspace folder gets its own port, and every Quarto project inside it is handled. See [vscode/README.md](vscode/README.md) for settings.
 
 3. **Preview** the deck or document with Preview in Positron or VS Code, or `quarto preview deck.qmd` in the terminal. (If a preview was already running when you installed the extension, restart it once.)
 
@@ -35,9 +23,22 @@ Click anywhere on a slide or page in the live preview and type what you want cha
 
 ## Using the overlay
 
+Press **D** (or click **Draw**) to sketch freehand, for example to show a layout change. Drag to draw, draw more strokes if needed, then type what the drawing means and save. The toolbar's **–** button collapses it to a small pill (and leaves annotate mode); click the pill to bring it back.
+
 Pins are orange while open and turn into green checks when resolved. Click a pin to read the thread, reply (which reopens the note), resolve or reopen it yourself, or delete it. **List** shows every note and jumps to its slide or section. **Copy** puts the open notes on the clipboard as Markdown, for assistants that can't read files. **Send** only appears when the editor extension is connected. Resolved notes are hidden by default, so the page shows only what's still open. **Show resolved** brings them back on the page and in List, and the setting is remembered in your browser.
 
 The dot in the toolbar is green when the server is reachable. When it's red, notes are kept in the browser and sent to the server once it's running.
+
+## Claude Code (CLI or Claude Desktop)
+
+Install the plugin, which starts the notes server with each session and adds `/annotate` to resolve notes:
+
+```bash
+claude plugin marketplace add blairj09/annotate
+claude plugin install annotate@annotate
+```
+
+Then run `/annotate setup` in a project, preview the deck (Desktop's built-in browser works), annotate, and run `/annotate`. See [claude-plugin/README.md](claude-plugin/README.md).
 
 ## Without the editor extension
 
@@ -98,11 +99,11 @@ annotate:
   server: http://127.0.0.1:4850    # match `server.ts --port`
 ```
 
-Leave `server` out when you use the editor extension. It picks the port, and a `server` in front matter overrides it.
+Leave `server` out when you use the editor extension or the Claude Code plugin. They pick the port, and a `server` in front matter overrides it.
 
 ## For your assistant
 
-**Send** includes these steps in the request, so with the editor extension you don't need them anywhere else. To ask an assistant yourself ("resolve the annotations"), or to use one that doesn't get the request from Send (Claude Code, Codex), paste this into your project's `AGENTS.md`, `CLAUDE.md`, or equivalent:
+**Send** includes these steps in the request, and the [Claude Code plugin](#claude-code-cli-or-claude-desktop)'s `/annotate` skill has them too, so with either you don't need them anywhere else. For other assistants (Codex, Gemini CLI, or any assistant you ask yourself to "resolve the annotations"), paste this into your project's `AGENTS.md`, `CLAUDE.md`, or equivalent:
 
 ```markdown
 ## Slide annotations
@@ -116,6 +117,9 @@ Slide notes live in `<deck>.annotations.json`. To "resolve annotations":
    `slide.title` and `target.text`, then `slide.number`. Document notes have
    `section` and `anchor`: match on `section.title` and `target.text`, then on
    `anchor` (the `index`-th `anchor.tag` element in that section, from 0).
+   A note with `strokes` is a freehand drawing (a layout sketch): each stroke is a list
+   of `[x, y]` points in % of the slide (documents: of the anchor element), and
+   `bounds` is its box `{x, y, w, h}`. Read the sketch together with the text.
 3. Make the edit. Then set `"status": "done"` and append
    `{"author": "assistant", "text": "<one line saying what changed>", "at": "<ISO time>"}`
    to `thread`. Change only `status`, `thread` (append only), `slide`, `section`,
@@ -157,6 +161,7 @@ Two renders at once can produce a broken HTML file.
 
 - `slide.number` is the visible slide number. `h` and `v` are reveal.js indices.
 - `x` and `y` are percentages of the slide, from the top left.
+- Drawings (press **D** or click **Draw**) add `strokes`, a list of polylines of `[x, y]` points in the same percentages, plus `bounds`.
 
 Notes on an HTML document have `section` and `anchor` in place of `slide`:
 

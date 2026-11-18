@@ -1,7 +1,13 @@
 # Builds the Positron / VS Code extension.
 # - Every push and PR that touches vscode/: package it and keep the .vsix as an artifact.
-# - Tags like vscode-v0.1.0: also attach the .vsix to a GitHub release, and publish
-#   to Open VSX (and the VS Code Marketplace) when the token secrets are set.
+# - Tags like vscode-v0.1.0: also attach the .vsix to a GitHub release, publish to
+#   Open VSX with trusted publishing (OIDC, no token), and publish to the VS Code
+#   Marketplace when VSCE_PAT is set.
+#
+# Open VSX trusted publishing can't create an extension, so the very first version
+# must be published with a token: set the OVSX_PAT secret for that one release, then
+# delete it. The registration on open-vsx.org must name this file
+# (vscode-extension.yml) and the `open-vsx` environment.
 name: Editor extension
 
 on:
@@ -14,11 +20,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   package:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # attach the .vsix to the release
     defaults:
       run:
         working-directory: vscode
@@ -30,7 +38,10 @@ jobs:
           node-version: 24
 
       - name: Check syntax
-        run: node --check extension.js
+        run: node --check extension.js && node --check yaml-filter.js
+
+      - name: Test
+        run: node --test "test/*.test.js"
 
       - name: Check tag matches package.json version
         if: startsWith(github.ref, 'refs/tags/vscode-v')
@@ -63,14 +74,38 @@ jobs:
             || gh release create "$GITHUB_REF_NAME" --title "Editor extension $version" --generate-notes
           gh release upload "$GITHUB_REF_NAME" "quarto-annotate-$version.vsix" --clobber
 
-      - name: Publish to Open VSX
-        if: startsWith(github.ref, 'refs/tags/vscode-v') && env.OVSX_PAT != ''
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: npx --yes ovsx publish quarto-annotate.vsix -p "$OVSX_PAT"
-
       - name: Publish to VS Code Marketplace
         if: startsWith(github.ref, 'refs/tags/vscode-v') && env.VSCE_PAT != ''
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: npx --yes @vscode/vsce publish --packagePath quarto-annotate.vsix -p "$VSCE_PAT"
+
+  open-vsx:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/vscode-v')
+    runs-on: ubuntu-24.04
+    # Trusted publishing trusts any ref that runs this file. The environment's
+    # deployment rule (tags matching vscode-v*) is what limits publishing to releases.
+    environment: open-vsx
+    permissions:
+      contents: read
+      id-token: write # lets ovsx exchange a GitHub OIDC token for a publish token
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: quarto-annotate-vsix
+
+      - name: Publish to Open VSX
+        env:
+          # Only for the first publish. When set, it takes precedence over trusted publishing.
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -n "$OVSX_PAT" ]; then
+            npx --yes ovsx publish quarto-annotate.vsix
+          else
+            npx --yes ovsx publish quarto-annotate.vsix --trusted-publishing
+          fi
