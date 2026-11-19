@@ -9,9 +9,9 @@
 "use strict";
 
 const vscode = require("vscode");
-const cp = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { launchQuarto } = require("./launch");
 const { addFilter, addFilterToQmd, qmdHasFilters } = require("./yaml-filter");
 
 const QUARTO_EXTENSION = "blairj09/annotate";
@@ -140,7 +140,7 @@ class Folder {
     return new Promise((resolve) => {
       const args = ["run", this.serverTs, this.root, "--port", String(port), "--watch-stdin"];
       info(`Starting: ${quarto} ${args.join(" ")}`);
-      const child = cp.spawn(quarto, args, { cwd: this.root, stdio: ["pipe", "pipe", "pipe"] });
+      const child = launchQuarto(quarto, args, { cwd: this.root, stdio: ["pipe", "pipe", "pipe"] });
       let settled = false;
       const settle = (ok) => {
         if (!settled) {
@@ -387,7 +387,13 @@ async function sendCommand(folder) {
 function runQuarto(quarto, args, cwd) {
   return new Promise((resolve) => {
     info(`Running: ${quarto} ${args.join(" ")} (in ${cwd})`);
-    const child = cp.spawn(quarto, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    let child;
+    try {
+      child = launchQuarto(quarto, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (e) {
+      resolve({ code: -1, out: e.message });
+      return;
+    }
     let out = "";
     const onData = (buf) => {
       out += buf.toString();
