@@ -38,7 +38,7 @@ jobs:
           node-version: 24
 
       - name: Check syntax
-        run: node --check extension.js && node --check yaml-filter.js
+        run: node --check extension.js && node --check yaml-filter.js && node --check launch.js
 
       - name: Test
         run: node --test "test/*.test.js"
@@ -80,8 +80,28 @@ jobs:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: npx --yes @vscode/vsce publish --packagePath quarto-annotate.vsix -p "$VSCE_PAT"
 
+  # The batch-launcher tests (quarto.cmd) only run on Windows; Ubuntu skips them.
+  test-windows:
+    runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: vscode
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Test
+        # Fail if anything was skipped, so the Windows-only tests can't silently stop running.
+        run: |
+          node --test --test-reporter=tap "test/*.test.js" | tee test.tap
+          grep -qx "# skipped 0" test.tap
+
   open-vsx:
-    needs: package
+    needs: [package, test-windows]
     if: startsWith(github.ref, 'refs/tags/vscode-v')
     runs-on: ubuntu-24.04
     # Trusted publishing trusts any ref that runs this file. The environment's
