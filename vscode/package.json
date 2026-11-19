@@ -2,7 +2,7 @@
   "name": "quarto-annotate",
   "displayName": "Quarto Annotate",
   "description": "Runs the notes server for the Quarto annotate extension and sends slide notes to your AI assistant.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "blairj09",
   "license": "MIT",
   "icon": "icon.png",
